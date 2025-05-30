@@ -103,7 +103,7 @@ smart-factory-digital-twin/
 3. **Start the infrastructure**
    ```bash
    cd docker
-   docker-compose up -d
+   docker compose up -d
    ```
 
 4. **Install Python dependencies**
@@ -214,27 +214,6 @@ Scale individual services:
 docker-compose up -d --scale kafka-consumer=3
 ```
 
-## 🧪 Testing
-
-Run the test suite:
-```bash
-pytest tests/
-```
-
-### Test Categories
-
-- Unit tests for individual components
-- Integration tests for data flow
-- Performance tests for streaming capacity
-- End-to-end system tests
-
-## 📈 Performance Considerations
-
-- **Throughput**: Handles 10,000+ messages per second
-- **Latency**: Sub-second anomaly detection
-- **Scalability**: Horizontally scalable consumers
-- **Fault Tolerance**: Built-in redundancy and recovery
-
 ## 🛠️ Technology Stack
 
 | Component | Technology |
@@ -247,36 +226,6 @@ pytest tests/
 | **Storage** | Elasticsearch, MongoDB |
 | **Containerization** | Docker, Docker Compose |
 
-## 🔍 Monitoring & Observability
-
-- **Kafka Metrics**: Message throughput, consumer lag
-- **Application Metrics**: Processing time, error rates
-- **System Metrics**: CPU, memory, disk usage
-- **Custom Dashboards**: Grafana integration available
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Setup
-
-```bash
-# Install development dependencies
-pip install -r requirements-dev.txt
-
-# Run pre-commit hooks
-pre-commit install
-
-# Run linting
-flake8 .
-
-# Run formatting
-black .
-```
 
 ## 📝 Use Cases
 
