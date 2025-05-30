@@ -1,0 +1,32 @@
+{
+  "machines": [
+    {
+      "id": "MACHINE_001",
+      "name": "CNC Lathe #1",
+      "sensors": {
+        "temperature": {"min": 65, "max": 85},
+        "vibration": {"min": 0.1, "max": 1.2},
+        "rpm": {"min": 1200, "max": 4500}
+      }
+    },
+    {
+      "id": "MACHINE_002", 
+      "name": "Milling Machine #1",
+      "sensors": {
+        "temperature": {"min": 70, "max": 95},
+        "vibration": {"min": 0.2, "max": 1.5},
+        "rpm": {"min": 800, "max": 3500}
+      }
+    },
+    {
+      "id": "MACHINE_003",
+      "name": "Assembly Robot #1", 
+      "sensors": {
+        "temperature": {"min": 60, "max": 80},
+        "vibration": {"min": 0.05, "max": 0.8},
+        "rpm": {"min": 1000, "max": 2500}
+      }
+    }
+  ],
+  "interval_seconds": 2
+}

@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Factory Digital Twin Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .status-indicator {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .anomaly-alert {
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">🏭 Smart Factory Digital Twin</h1>
+            <p class="text-gray-600">Real-time monitoring and predictive maintenance dashboard</p>
+            <div class="mt-2 flex items-center space-x-4">
+                <div class="flex items-center">
+                    <div id="connection-indicator" class="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                    <span id="connection-status" class="text-sm text-gray-600">Connecting...</span>
+                </div>
+                <div class="text-sm text-gray-500">
+                    Last updated: <span id="last-update">--</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Alert Section -->
+        <div id="alert-section" class="mb-6 hidden">
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative anomaly-alert" id="alert-box">
+                <strong class="font-bold">🚨 Anomaly Detected!</strong>
+                <span class="block sm:inline ml-2" id="alert-message"></span>
+                <button onclick="closeAlert()" class="absolute top-0 bottom-0 right-0 px-4 py-3">
+                    <span class="text-red-700">×</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Statistics Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold text-blue-600" id="total-machines">0</div>
+                <div class="text-sm text-gray-600">Active Machines</div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold text-green-600" id="normal-machines">0</div>
+                <div class="text-sm text-gray-600">Normal Status</div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold text-red-600" id="anomaly-count">0</div>
+                <div class="text-sm text-gray-600">Active Anomalies</div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow">
+                <div class="text-2xl font-bold text-purple-600" id="total-alerts">0</div>
+                <div class="text-sm text-gray-600">Total Alerts Today</div>
+            </div>
+        </div>
+
+        <!-- Machine Status Cards -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4">Machine Status</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="machine-cards">
+                <!-- Machine cards will be populated here -->
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Temperature Chart -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">🌡️ Temperature Monitoring</h3>
+                    <div class="text-sm text-gray-500">Real-time</div>
+                </div>
+                <canvas id="temperatureChart" height="300"></canvas>
+            </div>
+
+            <!-- Vibration Chart -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">📊 Vibration Analysis</h3>
+                    <div class="text-sm text-gray-500">Real-time</div>
+                </div>
+                <canvas id="vibrationChart" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- RPM and Additional Metrics -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- RPM Chart -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">⚙️ RPM Monitoring</h3>
+                    <div class="text-sm text-gray-500">Real-time</div>
+                </div>
+                <canvas id="rpmChart" height="300"></canvas>
+            </div>
+
+            <!-- Power Consumption Chart -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">⚡ Power Consumption</h3>
+                    <div class="text-sm text-gray-500">Real-time</div>
+                </div>
+                <canvas id="powerChart" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- Recent Anomalies Table -->
+        <div class="bg-white p-6 rounded-lg shadow">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">🚨 Recent Anomalies</h3>
+                <button onclick="clearAnomaliesTable()" class="text-sm text-blue-600 hover:text-blue-800">
+                    Clear History
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full table-auto">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Machine</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anomaly Score</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Temperature</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vibration</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RPM</th>
+                        </tr>
+                    </thead>
+                    <tbody id="anomalies-table" class="bg-white divide-y divide-gray-200">
+                        <tr id="no-anomalies" class="text-center text-gray-500">
+                            <td colspan="7" class="px-4 py-8">No anomalies detected yet</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Socket.IO
+        const socket = io();
+        
+        // Charts
+        let temperatureChart, vibrationChart, rpmChart, powerChart;
+        
+        // Data storage
+        let machineData = {};
+        let temperatureData = {};
+        let vibrationData = {};
+        let rpmData = {};
+        let powerData = {};
+        let anomalyCount = 0;
+        let totalAlertsToday = 0;
+        
+        // Chart colors
+        const chartColors = [
+            'rgb(59, 130, 246)',   // Blue
+            'rgb(16, 185, 129)',   // Green
+            'rgb(245, 101, 101)',  // Red
+            'rgb(139, 92, 246)',   // Purple
+            'rgb(245, 158, 11)',   // Yellow
+            'rgb(236, 72, 153)'    // Pink
+        ];
+        
+        // Initialize charts
+        function initCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Value'
+                        }
+                    }
+                }
+            };
+            
+            // Temperature Chart
+            const tempCtx = document.getElementById('temperatureChart').getContext('2d');
+            temperatureChart = new Chart(tempCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            ...chartOptions.scales.y,
+                            title: { display: true, text: 'Temperature (°C)' },
+                            min: 40,
+                            max: 120
+                        }
+                    }
+                }
+            });
+            
+            // Vibration Chart
+            const vibCtx = document.getElementById('vibrationChart').getContext('2d');
+            vibrationChart = new Chart(vibCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            ...chartOptions.scales.y,
+                            title: { display: true, text: 'Vibration' },
+                            beginAtZero: true,
+                            max: 6
+                        }
+                    }
+                }
+            });
+            
+            // RPM Chart
+            const rpmCtx = document.getElementById('rpmChart').getContext('2d');
+            rpmChart = new Chart(rpmCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            ...chartOptions.scales.y,
+                            title: { display: true, text: 'RPM' },
+                            beginAtZero: true,
+                            max: 6000
+                        }
+                    }
+                }
+            });
+            
+            // Power Chart
+            const powerCtx = document.getElementById('powerChart').getContext('2d');
+            powerChart = new Chart(powerCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            ...chartOptions.scales.y,
+                            title: { display: true, text: 'Power (kW)' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update statistics
+        function updateStatistics() {
+            const totalMachines = Object.keys(machineData).length;
+            const normalMachines = Object.values(machineData).filter(m => !m.is_anomaly).length;
+            const currentAnomalies = Object.values(machineData).filter(m => m.is_anomaly).length;
+            
+            document.getElementById('total-machines').textContent = totalMachines;
+            document.getElementById('normal-machines').textContent = normalMachines;
+            document.getElementById('anomaly-count').textContent = currentAnomalies;
+            document.getElementById('total-alerts').textContent = totalAlertsToday;
+        }
+        
+        // Update machine status cards
+        function updateMachineCards(machines) {
+            const container = document.getElementById('machine-cards');
+            container.innerHTML = '';
+            
+            Object.entries(machines).forEach(([machineId, data]) => {
+                const statusColor = data.is_anomaly ? 'red' : 'green';
+                const statusText = data.is_anomaly ? 'ALERT' : 'NORMAL';
+                const severityColor = data.severity === 'HIGH' ? 'red' : 
+                                    data.severity === 'MEDIUM' ? 'yellow' : 'green';
+                
+                const card = document.createElement('div');
+                card.className = 'bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">${machineId}</h3>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-${statusColor}-500 rounded-full mr-2 ${data.is_anomaly ? 'status-indicator' : ''}"></div>
+                            <span class="px-2 py-1 rounded text-sm text-white bg-${statusColor}-500">
+                                ${statusText}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Temperature:</span>
+                            <span class="font-mono font-semibold">${data.temperature}°C</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Vibration:</span>
+                            <span class="font-mono font-semibold">${data.vibration}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">RPM:</span>
+                            <span class="font-mono font-semibold">${data.rpm}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Power:</span>
+                            <span class="font-mono font-semibold">${data.power_consumption || 'N/A'} kW</span>
+                        </div>
+                        <div class="flex justify-between items-center border-t pt-2">
+                            <span class="text-gray-600">Anomaly Score:</span>
+                            <span class="font-mono font-semibold text-${severityColor}-600">
+                                ${data.anomaly_score.toFixed(3)}
+                            </span>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            Last update: ${new Date(data.last_update).toLocaleTimeString()}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            
+            updateStatistics();
+        }
+        
+        // Update charts with new data
+        function updateChart(chart, dataStorage, machineId, value, timestamp) {
+            if (!dataStorage[machineId]) {
+                dataStorage[machineId] = [];
+                const colorIndex = Object.keys(dataStorage).length - 1;
+                chart.data.datasets.push({
+                    label: machineId,
+                    data: [],
+                    borderColor: chartColors[colorIndex % chartColors.length],
+                    backgroundColor: chartColors[colorIndex % chartColors.length] + '20',
+                    fill: false,
+                    tension: 0.4
+                });
+            }
+            
+            dataStorage[machineId].push({ x: timestamp, y: value });
+            
+            // Keep only last 20 data points
+            if (dataStorage[machineId].length > 20) {
+                dataStorage[machineId].shift();
+            }
+            
+            // Update chart labels (use first machine's timestamps)
+            const firstMachine = Object.keys(dataStorage)[0];
+            if (firstMachine) {
+                chart.data.labels = dataStorage[firstMachine].map(d => d.x);
+            }
+            
+            // Update datasets
+            chart.data.datasets.forEach((dataset, index) => {
+                const machineKey = Object.keys(dataStorage)[index];
+                if (machineKey && dataStorage[machineKey]) {
+                    dataset.data = dataStorage[machineKey].map(d => d.y);
+                }
+            });
+            
+            chart.update('none');
+        }
+        
+        // Update all charts
+        function updateCharts(data) {
+            const timestamp = new Date(data.timestamp).toLocaleTimeString();
+            const machineId = data.machine_id;
+            const originalData = data.original_data;
+            
+            updateChart(temperatureChart, temperatureData, machineId, originalData.temperature, timestamp);
+            updateChart(vibrationChart, vibrationData, machineId, originalData.vibration, timestamp);
+            updateChart(rpmChart, rpmData, machineId, originalData.rpm, timestamp);
+            updateChart(powerChart, powerData, machineId, originalData.power_consumption || 0, timestamp);
+            
+            // Update last update time
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+        }
+        
+        // Update anomalies table
+        function updateAnomaliesTable(anomaly) {
+            const table = document.getElementById('anomalies-table');
+            const noAnomaliesRow = document.getElementById('no-anomalies');
+            
+            // Remove "no anomalies" message
+            if (noAnomaliesRow) {
+                noAnomaliesRow.remove();
+            }
+            
+            const time = new Date(anomaly.timestamp).toLocaleString();
+            const originalData = anomaly.original_data;
+            
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-50';
+            row.innerHTML = `
+                <td class="px-4 py-2 text-sm">${time}</td>
+                <td class="px-4 py-2 text-sm font-medium">${anomaly.machine_id}</td>
+                <td class="px-4 py-2">
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        anomaly.severity === 'HIGH' ? 'bg-red-100 text-red-800' :
+                        anomaly.severity === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-green-100 text-green-800'
+                    }">
+                        ${anomaly.severity}
+                    </span>
+                </td>
+                <td class="px-4 py-2 text-sm font-mono">${anomaly.anomaly_score.toFixed(3)}</td>
+                <td class="px-4 py-2 text-sm">${originalData.temperature}°C</td>
+                <td class="px-4 py-2 text-sm">${originalData.vibration}</td>
+                <td class="px-4 py-2 text-sm">${originalData.rpm}</td>
+            `;
+            
+            table.insertBefore(row, table.firstChild);
+            
+            // Keep only last 15 rows
+            while (table.children.length > 15) {
+                table.removeChild(table.lastChild);
+            }
+            
+            totalAlertsToday++;
+            updateStatistics();
+        }
+        
+        // Show alert
+        function showAlert(anomaly) {
+            const alertSection = document.getElementById('alert-section');
+            const alertMessage = document.getElementById('alert-message');
+            
+            alertMessage.textContent = `${anomaly.machine_id} detected ${anomaly.severity.toLowerCase()} severity anomaly (Score: ${anomaly.anomaly_score.toFixed(3)})`;
+            alertSection.classList.remove('hidden');
+            
+            // Auto-hide alert after 8 seconds
+            setTimeout(() => {
+                alertSection.classList.add('hidden');
+            }, 8000);
+        }
+        
+        // Close alert manually
+        function closeAlert() {
+            document.getElementById('alert-section').classList.add('hidden');
+        }
+        
+        // Clear anomalies table
+        function clearAnomaliesTable() {
+            const table = document.getElementById('anomalies-table');
+            table.innerHTML = '<tr id="no-anomalies" class="text-center text-gray-500"><td colspan="7" class="px-4 py-8">No anomalies detected yet</td></tr>';
+        }
+        
+        // Update connection status
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('connection-indicator');
+            const status = document.getElementById('connection-status');
+            
+            if (connected) {
+                indicator.className = 'w-3 h-3 bg-green-500 rounded-full mr-2';
+                status.textContent = 'Connected';
+            } else {
+                indicator.className = 'w-3 h-3 bg-red-500 rounded-full mr-2';
+                status.textContent = 'Disconnected';
+            }
+        }
+        
+        // Socket event handlers
+        socket.on('connect', function() {
+            console.log('Connected to dashboard');
+            updateConnectionStatus(true);
+        });
+        
+        socket.on('disconnect', function() {
+            console.log('Disconnected from dashboard');
+            updateConnectionStatus(false);
+        });
+        
+        socket.on('machine_status', function(machines) {
+            machineData = machines;
+            updateMachineCards(machines);
+        });
+        
+        socket.on('sensor_update', function(data) {
+            // Update machine data
+            const machineId = data.machine_id;
+            const originalData = data.original_data;
+            
+            if (!machineData[machineId]) {
+                machineData[machineId] = {};
+            }
+            
+            machineData[machineId] = {
+                last_update: data.timestamp,
+                temperature: originalData.temperature,
+                vibration: originalData.vibration,
+                rpm: originalData.rpm,
+                power_consumption: originalData.power_consumption,
+                is_anomaly: data.ml_detected_anomaly,
+                anomaly_score: data.anomaly_score,
+                severity: data.severity || 'LOW'
+            };
+            
+            updateMachineCards(machineData);
+            updateCharts(data);
+        });
+        
+        socket.on('anomaly_alert', function(anomaly) {
+            showAlert(anomaly);
+            updateAnomaliesTable(anomaly);
+        });
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            updateConnectionStatus(false);
+            
+            // Load initial data
+            fetch('/api/machines')
+                .then(response => response.json())
+                .then(machines => {
+                    machineData = machines;
+                    updateMachineCards(machines);
+                })
+                .catch(error => {
+                    console.error('Error loading initial data:', error);
+                });
+                
+            // Load recent anomalies
+            fetch('/api/anomalies')
+                .then(response => response.json())
+                .then(anomalies => {
+                    anomalies.forEach(anomaly => {
+                        updateAnomaliesTable(anomaly);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading anomalies:', error);
+                });
+        });
+        
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                console.log('Dashboard hidden');
+            } else {
+                console.log('Dashboard visible - refreshing data');
+                // Refresh data when page becomes visible
+                socket.emit('request_refresh');
+            }
+        });
+    </script>
+</body>
+</html>
